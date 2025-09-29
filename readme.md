@@ -4,7 +4,7 @@
 
 This is a pure front-end Speech-to-Text tool powered by the `FunAudioLLM/SenseVoiceSmall` model from SiliconFlow. It's a single, standalone HTML file that requires no backend setup, making it incredibly easy for non-technical users to download and run.
 
-![工具界面截图](./screenshots/批注 2025-09-29 204518.png)  
+![工具界面截图](./screenshots/1.png)  
 
 
 ## ✨ 功能特性 (Features)
