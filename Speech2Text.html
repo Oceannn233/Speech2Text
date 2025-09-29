@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语音转文本工具 (由硅基流动驱动)</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f5f7fa;
+            --text-color: #333;
+            --border-color: #dcdfe6;
+            --success-color: #67c23a;
+            --error-color: #f56c6c;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body {
+            font-family: var(--font-family);
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            padding: 30px;
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+        .api-key-section {
+            margin-bottom: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+        .api-key-section label {
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .api-key-input-wrapper {
+            display: flex;
+            align-items: center;
+        }
+        #apiKey {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        #apiKey:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+        #saveApiKey {
+            margin-left: 10px;
+            padding: 12px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+        }
+        #saveApiKey:hover {
+            background-color: #357abd;
+        }
+        .upload-section {
+            text-align: center;
+            padding: 40px;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            background-color: #fafafa;
+            margin-bottom: 25px;
+            cursor: pointer;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .upload-section:hover {
+            background-color: #f0f4ff;
+            border-color: var(--primary-color);
+        }
+        .upload-section p {
+            margin: 0;
+            font-size: 1.1em;
+            color: #666;
+        }
+        #audioFile {
+            display: none;
+        }
+        .result-section {
+            margin-top: 20px;
+        }
+        #result, #history {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: #f9f9f9;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 1em;
+            line-height: 1.6;
+        }
+        .result-header, .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .result-header h2, .history-header h2 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        #copyButton, #clearHistoryButton {
+            padding: 8px 15px;
+            background-color: var(--success-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.3s;
+        }
+        #copyButton:hover {
+            background-color: #58a032;
+        }
+        #clearHistoryButton {
+            background-color: var(--error-color);
+        }
+        #clearHistoryButton:hover {
+            background-color: #d43f3f;
+        }
+        .history-item {
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 0;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-item .timestamp {
+            font-size: 0.85em;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .history-item .text {
+            font-size: 1em;
+            color: var(--text-color);
+        }
+        .loader {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: var(--primary-color);
+            animation: spin 1s ease infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status {
+            font-size: 1.1em;
+            color: var(--primary-color);
+        }
+        .file-info {
+            text-align: center;
+            margin-bottom: 15px;
+            font-style: italic;
+            color: #555;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>语音转文本工具</h1>
+        <p style="text-align: center; margin-top: -15px; margin-bottom: 25px; color: #777;">使用 硅基流动 FunAudioLLM/SenseVoiceSmall 模型</p>
+
+        <div class="api-key-section">
+            <label for="apiKey">请输入您的硅基流动 API Key:</label>
+            <div class="api-key-input-wrapper">
+                <input type="password" id="apiKey" placeholder="在此输入API Key">
+                <button id="saveApiKey">保存</button>
+            </div>
+             <small style="margin-top: 5px; color: #888;">API Key 将仅保存在您的浏览器本地，不会上传。</small>
+        </div>
+
+        <div id="uploadArea" class="upload-section">
+            <p>点击此处或拖拽音频文件到这里</p>
+            <p style="font-size: 0.9em; color: #999; margin-top: 8px;">支持 .mp3, .wav, .m4a, .flac 等常见格式</p>
+        </div>
+        <input type="file" id="audioFile" accept="audio/*">
+        <div id="fileInfo" class="file-info hidden"></div>
+
+        <div id="loader" class="loader">
+            <div class="spinner"></div>
+            <p id="status" class="status">正在上传并转写，请稍候...</p>
+        </div>
+
+        <div id="resultSection" class="result-section hidden">
+            <div class="result-header">
+                <h2>转写结果</h2>
+                <button id="copyButton">复制文本</button>
+            </div>
+            <div id="result" contenteditable="false"></div>
+        </div>
+
+        <div class="history-section" style="margin-top: 40px;">
+            <div class="history-header">
+                <h2>历史记录</h2>
+                <button id="clearHistoryButton">清空记录</button>
+            </div>
+            <div id="history">
+                <p id="noHistory" style="text-align:center; color:#999;">暂无历史记录</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM 元素获取 ---
+            const apiKeyInput = document.getElementById('apiKey');
+            const saveApiKeyButton = document.getElementById('saveApiKey');
+            const uploadArea = document.getElementById('uploadArea');
+            const audioFileInput = document.getElementById('audioFile');
+            const fileInfoDiv = document.getElementById('fileInfo');
+            const loader = document.getElementById('loader');
+            const statusText = document.getElementById('status');
+            const resultSection = document.getElementById('resultSection');
+            const resultDiv = document.getElementById('result');
+            const copyButton = document.getElementById('copyButton');
+            const historyDiv = document.getElementById('history');
+            const clearHistoryButton = document.getElementById('clearHistoryButton');
+            const noHistoryP = document.getElementById('noHistory');
+
+            const SILICONFLOW_API_URL = 'https://api.siliconflow.cn/v1/audio/transcriptions';
+            const MODEL_NAME = 'FunAudioLLM/SenseVoiceSmall';
+            let apiKey = '';
+
+            // --- 功能函数 ---
+
+            /**
+             * 显示提示信息
+             * @param {string} message - 提示内容
+             * @param {string} type - 'success' 或 'error'
+             */
+            const showToast = (message, type = 'success') => {
+                const toast = document.createElement('div');
+                toast.textContent = message;
+                toast.style.position = 'fixed';
+                toast.style.top = '20px';
+                toast.style.left = '50%';
+                toast.style.transform = 'translateX(-50%)';
+                toast.style.padding = '12px 25px';
+                toast.style.borderRadius = '6px';
+                toast.style.color = '#fff';
+                toast.style.backgroundColor = type === 'success' ? 'var(--success-color)' : 'var(--error-color)';
+                toast.style.zIndex = '1000';
+                toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 3000);
+            };
+
+            /**
+             * 加载并显示API Key
+             */
+            const loadApiKey = () => {
+                const savedKey = localStorage.getItem('siliconflowApiKey');
+                if (savedKey) {
+                    apiKeyInput.value = savedKey;
+                    apiKey = savedKey;
+                }
+            };
+
+            /**
+             * 保存API Key到本地存储
+             */
+            const saveApiKey = () => {
+                const key = apiKeyInput.value.trim();
+                if (key) {
+                    localStorage.setItem('siliconflowApiKey', key);
+                    apiKey = key;
+                    showToast('API Key 已保存！', 'success');
+                } else {
+                    showToast('请输入有效的 API Key！', 'error');
+                }
+            };
+
+            /**
+             * 加载并显示历史记录
+             */
+            const loadHistory = () => {
+                const history = JSON.parse(localStorage.getItem('transcriptionHistory') || '[]');
+                historyDiv.innerHTML = ''; // 清空现有内容
+                if (history.length === 0) {
+                    historyDiv.appendChild(noHistoryP);
+                    noHistoryP.classList.remove('hidden');
+                } else {
+                    noHistoryP.classList.add('hidden');
+                    history.forEach(item => {
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'history-item';
+                        historyItem.innerHTML = `
+                            <div class="timestamp">${new Date(item.timestamp).toLocaleString()}</div>
+                            <div class="text">${item.text}</div>
+                        `;
+                        historyDiv.appendChild(historyItem);
+                    });
+                }
+            };
+            
+            /**
+             * 添加新记录到历史
+             * @param {string} text - 转写的文本
+             */
+            const addHistoryItem = (text) => {
+                let history = JSON.parse(localStorage.getItem('transcriptionHistory') || '[]');
+                history.unshift({ text, timestamp: new Date().toISOString() });
+                // 只保留最近 20 条记录
+                if (history.length > 20) {
+                    history = history.slice(0, 20);
+                }
+                localStorage.setItem('transcriptionHistory', JSON.stringify(history));
+                loadHistory();
+            };
+
+            /**
+             * 清空历史记录
+             */
+            const clearHistory = () => {
+                if (confirm('您确定要清空所有历史记录吗？')) {
+                    localStorage.removeItem('transcriptionHistory');
+                    loadHistory();
+                    showToast('历史记录已清空。', 'success');
+                }
+            };
+
+            /**
+             * 处理文件上传和API调用
+             * @param {File} file - 用户上传的音频文件
+             */
+            const handleFileUpload = async (file) => {
+                if (!apiKey) {
+                    showToast('请先设置您的 API Key！', 'error');
+                    apiKeyInput.focus();
+                    return;
+                }
+
+                if (!file) {
+                    return;
+                }
+
+                // --- 更新UI状态 ---
+                fileInfoDiv.textContent = `已选择文件: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                fileInfoDiv.classList.remove('hidden');
+                loader.style.display = 'block';
+                statusText.textContent = '正在上传并转写，请稍候...';
+                resultSection.classList.add('hidden');
+                resultDiv.textContent = '';
+
+                // --- 准备API请求 ---
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('model', MODEL_NAME);
+                // formData.append('language', 'zh'); // 如果需要可以指定语言
+
+                try {
+                    const response = await fetch(SILICONFLOW_API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error ? errorData.error.message : `HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const transcribedText = data.text;
+
+                    // --- 显示结果 ---
+                    resultDiv.textContent = transcribedText;
+                    resultSection.classList.remove('hidden');
+                    addHistoryItem(transcribedText);
+                    showToast('转写成功！', 'success');
+
+                } catch (error) {
+                    console.error('Error during transcription:', error);
+                    resultDiv.textContent = `发生错误: ${error.message}`;
+                    resultSection.classList.remove('hidden');
+                    showToast(`转写失败: ${error.message}`, 'error');
+                } finally {
+                    loader.style.display = 'none';
+                    audioFileInput.value = ''; // 重置文件输入，以便可以再次上传同一个文件
+                }
+            };
+
+
+            // --- 事件监听 ---
+            saveApiKeyButton.addEventListener('click', saveApiKey);
+
+            uploadArea.addEventListener('click', () => audioFileInput.click());
+            
+            // 拖拽上传
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.backgroundColor = '#f0f4ff';
+                uploadArea.style.borderColor = 'var(--primary-color)';
+            });
+            uploadArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                uploadArea.style.backgroundColor = '#fafafa';
+                uploadArea.style.borderColor = 'var(--border-color)';
+            });
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.backgroundColor = '#fafafa';
+                uploadArea.style.borderColor = 'var(--border-color)';
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileUpload(files[0]);
+                }
+            });
+
+            audioFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileUpload(e.target.files[0]);
+                }
+            });
+
+            copyButton.addEventListener('click', () => {
+                navigator.clipboard.writeText(resultDiv.textContent)
+                    .then(() => {
+                        showToast('已复制到剪贴板！', 'success');
+                    })
+                    .catch(err => {
+                        showToast('复制失败！', 'error');
+                        console.error('Copy failed', err);
+                    });
+            });
+            
+            clearHistoryButton.addEventListener('click', clearHistory);
+
+            // --- 初始化 ---
+            loadApiKey();
+            loadHistory();
+        });
+    </script>
+</body>
+</html>
